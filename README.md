@@ -21,7 +21,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/你的用户名/xhs-scraper.git
+git clone https://github.com/zhilianyang06-jpg/xhs-scraper.git
 cd xhs-scraper
 
 # 2. 安装依赖
