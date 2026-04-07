@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌸 小红书笔记采集器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f7f7f7;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    /* ── 顶栏 ── */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    header .logo { font-size: 22px; }
+    header h1 { font-size: 17px; font-weight: 600; color: #222; }
+    header .badge {
+      margin-left: auto;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      background: #f0f0f0;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all .3s;
+    }
+    header .badge.logged-in { background: #e8f5e9; color: #2e7d32; }
+    header .badge .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+    header .badge.logged-in .dot { background: #43a047; }
+
+    /* ── 输入区 ── */
+    .input-section {
+      max-width: 860px;
+      margin: 28px auto 0;
+      padding: 0 20px;
+    }
+    .input-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 22px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .input-card h2 {
+      font-size: 15px;
+      color: #555;
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+    #urlInput {
+      flex: 1;
+      padding: 11px 16px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border .2s;
+      background: #fafafa;
+    }
+    #urlInput:focus { border-color: #ff2442; background: #fff; }
+    #urlInput::placeholder { color: #bbb; }
+
+    button {
+      padding: 11px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    #scrapeBtn {
+      background: #ff2442;
+      color: #fff;
+      min-width: 90px;
+    }
+    #scrapeBtn:hover { background: #e01e3c; }
+    #scrapeBtn:disabled { background: #ffb3be; cursor: not-allowed; }
+
+    #loginBtn {
+      background: #fff;
+      color: #555;
+      border: 1.5px solid #ddd;
+    }
+    #loginBtn:hover { border-color: #ff2442; color: #ff2442; }
+
+    #exportBtn {
+      background: #fff;
+      color: #555;
+      border: 1.5px solid #ddd;
+    }
+    #exportBtn:hover { border-color: #43a047; color: #43a047; }
+
+    /* ── 状态提示 ── */
+    #statusBar {
+      margin-top: 12px;
+      min-height: 22px;
+      font-size: 13px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #statusBar.error { color: #c0392b; }
+    #statusBar.success { color: #27ae60; }
+    #statusBar.loading { color: #2196f3; }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid #ddd;
+      border-top-color: #2196f3;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .spinner.show { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 数据表格 ── */
+    .table-section {
+      max-width: 1200px;
+      margin: 24px auto 40px;
+      padding: 0 20px;
+    }
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .table-header h2 {
+      font-size: 15px;
+      color: #333;
+      font-weight: 600;
+    }
+    .count-badge {
+      background: #ff2442;
+      color: #fff;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+
+    .table-wrap {
+      background: #fff;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead tr {
+      background: #ff2442;
+      color: #fff;
+    }
+    thead th {
+      padding: 12px 14px;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid #f5f5f5; }
+    tbody tr:hover { background: #fff8f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 11px 14px;
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .td-title { max-width: 240px; font-weight: 500; color: #222; }
+    .td-title a { color: #ff2442; text-decoration: none; }
+    .td-title a:hover { text-decoration: underline; }
+    .td-content { max-width: 300px; color: #555; }
+    .td-content .content-text {
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      cursor: pointer;
+    }
+    .td-content .content-text.expanded { -webkit-line-clamp: unset; }
+    .td-tags { max-width: 200px; }
+    .tag {
+      display: inline-block;
+      background: #fff0f2;
+      color: #ff2442;
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin: 2px 2px 2px 0;
+      font-size: 12px;
+    }
+    .td-num { text-align: center; color: #333; font-variant-numeric: tabular-nums; }
+    .td-date { white-space: nowrap; color: #888; font-size: 12px; }
+
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #bbb;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* 解析预览条 */
+    #parsePreview {
+      display: none;
+      margin-top: 10px;
+      padding: 9px 14px;
+      background: #fff8f9;
+      border: 1px solid #ffd6db;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
+    }
+    #parsePreview.show { display: block; }
+    #parsePreview .pv-label { color: #aaa; margin-right: 4px; }
+    #parsePreview .pv-val  { color: #222; font-weight: 500; }
+    #parsePreview .pv-url  { color: #ff2442; word-break: break-all; }
+
+    /* 输入框：多行文本 */
+    #urlInput {
+      flex: 1;
+      padding: 11px 16px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 13px;
+      outline: none;
+      transition: border .2s;
+      background: #fafafa;
+      resize: vertical;
+      min-height: 44px;
+      max-height: 120px;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+    #urlInput:focus { border-color: #ff2442; background: #fff; }
+    #urlInput::placeholder { color: #bbb; }
+
+    /* 新增行动画 */
+    @keyframes fadeIn {
+      from { background: #fff0f2; }
+      to   { background: transparent; }
+    }
+    .new-row { animation: fadeIn 1.5s ease-out; }
+
+    /* Hook 类型 badge */
+    .hook-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .hook-疑问型   { background:#e3f2fd; color:#1565c0; }
+    .hook-数字型   { background:#f3e5f5; color:#6a1b9a; }
+    .hook-悬念型   { background:#fff3e0; color:#e65100; }
+    .hook-痛点型   { background:#fce4ec; color:#c62828; }
+    .hook-干货型   { background:#e8f5e9; color:#1b5e20; }
+    .hook-故事型   { background:#fffde7; color:#f57f17; }
+    .hook-情绪型   { background:#fce4ec; color:#ad1457; }
+    .hook-对比型   { background:#e0f2f1; color:#00695c; }
+    .hook-反常识型 { background:#ede7f6; color:#4527a0; }
+    .hook-促销型   { background:#fff8e1; color:#ff6f00; }
+    .hook-通用型   { background:#f5f5f5; color:#757575; }
+
+    /* ── Duplicate 弹窗 ── */
+    #dupMask {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #dupMask.show { display: flex; }
+    #dupModal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 28px 22px;
+      width: 440px;
+      max-width: 95vw;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.18);
+    }
+    #dupModal h3 { font-size: 16px; font-weight: 600; }
+    #dupExisting {
+      background: #fff8f9;
+      border: 1px solid #ffd6db;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.7;
+    }
+    #dupExisting b { color: #222; }
+    #dupModalFooter { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+    #dupAddBtn {
+      background: #ff2442; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 9px 20px; font-size: 14px;
+      font-weight: 500; cursor: pointer;
+    }
+    #dupAddBtn:hover { background: #e01e3c; }
+    #dupCancelBtn {
+      background: #fff; color: #555;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      padding: 9px 16px; font-size: 14px; cursor: pointer;
+    }
+
+    /* ── Clear 弹窗 ── */
+    #clearMask {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #clearMask.show { display: flex; }
+    #clearModal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 28px 22px;
+      width: 420px;
+      max-width: 95vw;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.18);
+    }
+    #clearModal h3 { font-size: 16px; font-weight: 600; }
+    #clearModal .sub { font-size: 13px; color: #888; line-height: 1.7; }
+    #clearModalFooter { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+    #clearConfirmBtn {
+      background: #e53935; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 9px 20px; font-size: 14px;
+      font-weight: 500; cursor: pointer;
+    }
+    #clearConfirmBtn:hover { background: #c62828; }
+    #clearCancelBtn {
+      background: #fff; color: #555;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      padding: 9px 16px; font-size: 14px; cursor: pointer;
+    }
+
+    /* ── Audit 弹窗 ── */
+    #auditMask {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #auditMask.show { display: flex; }
+    #auditModal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 28px 22px;
+      width: 520px;
+      max-width: 95vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.18);
+    }
+    #auditModal h3 { font-size: 16px; font-weight: 600; }
+    #auditModal .sub { font-size: 13px; color: #888; }
+    #auditLog {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #f0f0f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      min-height: 160px;
+      max-height: 340px;
+      background: #fafafa;
+    }
+    .log-item { padding: 5px 0; border-bottom: 1px solid #f5f5f5; display: flex; gap: 8px; align-items: flex-start; }
+    .log-item:last-child { border: none; }
+    .log-icon { flex-shrink: 0; font-size: 15px; }
+    .log-text { color: #444; line-height: 1.4; }
+    .log-err  { color: #c0392b; }
+    #auditProgress {
+      height: 6px; border-radius: 3px;
+      background: #f0f0f0; overflow: hidden;
+    }
+    #auditBar {
+      height: 100%; background: #ff2442;
+      border-radius: 3px; width: 0%;
+      transition: width .3s;
+    }
+    #auditModalFooter { display: flex; justify-content: flex-end; gap: 10px; }
+    #auditFixBtn {
+      background: #ff2442; color: #fff;
+      border: none; border-radius: 8px;
+      padding: 9px 20px; font-size: 14px;
+      font-weight: 500; cursor: pointer;
+    }
+    #auditFixBtn:disabled { background: #ffb3be; cursor: not-allowed; }
+    #auditCloseBtn {
+      background: #fff; color: #555;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      padding: 9px 16px; font-size: 14px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">🌸</span>
+  <h1>小红书笔记采集器</h1>
+  <div id="loginBadge" class="badge">
+    <span class="dot"></span>
+    <span id="loginText">未登录（仅采集基础信息）</span>
+  </div>
+</header>
+
+<div class="input-section">
+  <div class="input-card">
+    <h2>粘贴小红书分享文本或链接，按 Ctrl+Enter 或点击「采集」</h2>
+    <div class="input-row">
+      <textarea id="urlInput" rows="2"
+        placeholder="支持完整分享文本，例如：&#10;23 【标题 - 作者 | 小红书】 😆 CODE 😆 https://www.xiaohongshu.com/...&#10;也支持直接粘贴短链：http://xhslink.com/..."></textarea>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button id="scrapeBtn" onclick="doScrape()">采集</button>
+        <button id="loginBtn" onclick="doLogin()">🔑 扫码登录</button>
+        <button id="exportBtn" onclick="doExport()">📥 导出 Excel</button>
+        <button id="auditBtn" onclick="openAudit()" style="background:#fff;color:#e67e22;border:1.5px solid #f0c080;border-radius:10px;padding:11px 20px;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;">🔧 修复脏数据</button>
+        <button id="clearBtn" onclick="openClear()" style="background:#fff;color:#888;border:1.5px solid #ddd;border-radius:10px;padding:11px 20px;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;">🗑️ 清空数据</button>
+      </div>
+    </div>
+    <!-- 解析预览 -->
+    <div id="parsePreview">
+      <span class="pv-label">标题：</span><span id="pvTitle" class="pv-val"></span>
+      <span class="pv-label">作者：</span><span id="pvAuthor" class="pv-val"></span><br/>
+      <span class="pv-label">链接：</span><span id="pvUrl" class="pv-url"></span>
+    </div>
+    <div id="statusBar">
+      <div id="spinner" class="spinner"></div>
+      <span id="statusText">粘贴分享内容后自动识别，点击采集保存到 Excel</span>
+    </div>
+  </div>
+</div>
+
+<div class="table-section">
+  <div class="table-header">
+    <h2>
+      已采集笔记
+      <span id="countBadge" class="count-badge">0</span>
+    </h2>
+  </div>
+  <div class="table-wrap">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>标题</th>
+          <th>作者</th>
+          <th>发布日期</th>
+          <th>正文内容</th>
+          <th>Hook类型</th>
+          <th>话题标签</th>
+          <th>点赞</th>
+          <th>收藏</th>
+          <th>评论</th>
+          <th>原链接</th>
+          <th>采集时间</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr id="emptyRow">
+          <td colspan="10">
+            <div class="empty-state">
+              <div class="icon">📋</div>
+              <p>还没有采集任何笔记，粘贴链接开始吧！</p>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let rowCount = 0;
+
+  // ── 页面加载：恢复历史数据 + 检查登录状态 ──
+  let _parseTimer = null;
+
+  window.addEventListener('DOMContentLoaded', () => {
+    loadHistoryData();
+    pollLoginStatus();
+
+    const input = document.getElementById('urlInput');
+    // Ctrl+Enter 触发采集
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) doScrape();
+    });
+    // 粘贴 / 输入后实时预览解析结果
+    input.addEventListener('input', () => {
+      clearTimeout(_parseTimer);
+      _parseTimer = setTimeout(() => previewParse(input.value), 300);
+    });
+    input.addEventListener('paste', () => {
+      // paste 事件在 value 更新前触发，延迟一帧
+      setTimeout(() => previewParse(input.value), 50);
+    });
+  });
+
+  async function previewParse(text) {
+    text = text.trim();
+    const preview = document.getElementById('parsePreview');
+    if (!text) { preview.classList.remove('show'); return; }
+    try {
+      const res = await fetch('/parse', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text}),
+      });
+      const d = await res.json();
+      document.getElementById('pvTitle').textContent  = d.title  || '（将从页面采集）';
+      document.getElementById('pvAuthor').textContent = d.author || '（将从页面采集）';
+      document.getElementById('pvUrl').textContent    = d.url    || '未检测到链接';
+      preview.classList.toggle('show', !!(d.url || d.title));
+    } catch(e) {}
+  }
+
+  async function loadHistoryData() {
+    try {
+      const res = await fetch('/data');
+      const rows = await res.json();
+      if (rows.length > 0) {
+        document.getElementById('emptyRow')?.remove();
+        rows.forEach(r => appendRow({
+          seq: r['序号'],
+          title: r['标题'],
+          author: r['作者'],
+          date: r['发布日期'],
+          content: r['正文内容'],
+          hook_type: r['Hook类型'],
+          tags: r['话题标签'],
+          likes: r['点赞数'],
+          collects: r['收藏数'],
+          comments: r['评论数'],
+          original_url: r['原链接'],
+          final_url: r['笔记链接'],
+          scraped_at: r['采集时间'],
+        }, false));
+      }
+    } catch(e) {}
+  }
+
+  // ── 采集 ──
+  let _pendingScrapeText = '';   // 查重命中时暂存，待用户确认后 force 提交
+
+  async function doScrape(force = false) {
+    const text = force ? _pendingScrapeText : document.getElementById('urlInput').value.trim();
+    if (!text) { setStatus('请先粘贴小红书分享内容', 'error'); return; }
+
+    if (!force) _pendingScrapeText = text;
+
+    setStatus('正在采集，请稍候...', 'loading', true);
+    document.getElementById('scrapeBtn').disabled = true;
+
+    try {
+      const res = await fetch('/scrape', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text, force}),
+      });
+      const data = await res.json();
+
+      if (data.duplicate) {
+        setLoading(false);
+        document.getElementById('scrapeBtn').disabled = false;
+        setStatus('⚠️ 该内容已存在，请在弹窗中确认', '');
+        showDup(data.existing);
+        return;
+      }
+
+      if (data.success) {
+        document.getElementById('emptyRow')?.remove();
+        appendRow(data.data, true);
+        document.getElementById('urlInput').value = '';
+        _pendingScrapeText = '';
+        document.getElementById('parsePreview').classList.remove('show');
+        setStatus(`✅ 采集成功：${data.data.title || '无标题'}`, 'success');
+      } else {
+        setStatus(`❌ 采集失败：${data.error}`, 'error');
+        fetch('/login-status').then(r => r.json()).then(d => updateLoginBadge(d.logged_in));
+      }
+    } catch(e) {
+      setStatus(`❌ 请求错误：${e.message}`, 'error');
+    } finally {
+      document.getElementById('scrapeBtn').disabled = false;
+      setLoading(false);
+    }
+  }
+
+  // ── 去重弹窗 ──
+  function showDup(existing) {
+    document.getElementById('dupExisting').innerHTML =
+      `<b>${escHtml(existing.title || '无标题')}</b>
+       <br>作者：${escHtml(existing.author || '—')}
+       <br>发布日期：${escHtml(existing.date || '—')}
+       <br>采集时间：${escHtml(existing.scraped_at || '—')}
+       <br>序号：第 ${existing.seq} 行`;
+    document.getElementById('dupMask').classList.add('show');
+  }
+  function closeDup() {
+    document.getElementById('dupMask').classList.remove('show');
+    setStatus('已取消，未重复添加', '');
+  }
+  function forceAdd() {
+    document.getElementById('dupMask').classList.remove('show');
+    doScrape(true);
+  }
+
+  // ── 登录 ──
+  async function doLogin() {
+    setStatus('正在打开浏览器，请扫码登录...', 'loading', true);
+    document.getElementById('loginBtn').disabled = true;
+    try {
+      const res = await fetch('/login', {method: 'POST'});
+      const data = await res.json();
+      setStatus(data.message, 'loading');
+      // 开始轮询登录状态
+      pollLoginStatus(true);
+    } catch(e) {
+      setStatus('启动登录失败：' + e.message, 'error');
+      document.getElementById('loginBtn').disabled = false;
+      setLoading(false);
+    }
+  }
+
+  let _pollTimer = null;
+  function pollLoginStatus(active = false) {
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch('/login-status');
+        const data = await res.json();
+        updateLoginBadge(data.logged_in);
+
+        if (data.state === 'done') {
+          setStatus('✅ 登录成功！现在可以采集完整正文内容', 'success');
+          setLoading(false);
+          document.getElementById('loginBtn').disabled = false;
+          clearInterval(_pollTimer);
+        } else if (data.state === 'failed') {
+          setStatus('❌ 登录失败，请重试', 'error');
+          setLoading(false);
+          document.getElementById('loginBtn').disabled = false;
+          clearInterval(_pollTimer);
+        } else if (!active) {
+          clearInterval(_pollTimer);
+        }
+      } catch(e) {}
+    }, 2000);
+  }
+
+  function updateLoginBadge(loggedIn) {
+    const badge = document.getElementById('loginBadge');
+    const text = document.getElementById('loginText');
+    if (loggedIn) {
+      badge.className = 'badge logged-in';
+      text.textContent = '已登录（可采集完整正文）';
+    } else {
+      badge.className = 'badge';
+      text.textContent = '未登录（仅采集基础信息）';
+    }
+  }
+
+  // ── 导出 ──
+  function doExport() {
+    window.location.href = '/export';
+    setStatus('📥 Excel 文件开始下载...', 'success');
+  }
+
+  // ── 追加行 ──
+  function appendRow(d, animate) {
+    rowCount++;
+    const tbody = document.getElementById('tableBody');
+    const tr = document.createElement('tr');
+    if (animate) tr.className = 'new-row';
+
+    const tags = (d.tags || '').split(/\s+/).filter(t => t.startsWith('#'))
+      .map(t => `<span class="tag">${escHtml(t)}</span>`).join('');
+
+    const contentId = 'content-' + rowCount;
+    const noteUrl = d.final_url || d.original_url || '#';
+
+    tr.innerHTML = `
+      <td class="td-num">${d.seq || rowCount}</td>
+      <td class="td-title">
+        <a href="${escHtml(noteUrl)}" target="_blank">${escHtml(d.title || '无标题')}</a>
+      </td>
+      <td>${escHtml(d.author || '')}</td>
+      <td class="td-date">${escHtml(d.date || '')}</td>
+      <td class="td-content">
+        <div id="${contentId}" class="content-text" onclick="toggleContent('${contentId}')">
+          ${escHtml(d.content || '（未登录，无正文）')}
+        </div>
+      </td>
+      <td style="text-align:center;">
+        ${d.hook_type ? `<span class="hook-badge hook-${escHtml(d.hook_type)}">${escHtml(d.hook_type)}</span>` : '<span style="color:#ccc">—</span>'}
+      </td>
+      <td class="td-tags">${tags || '<span style="color:#ccc">—</span>'}</td>
+      <td class="td-num">${escHtml(String(d.likes || '—'))}</td>
+      <td class="td-num">${escHtml(String(d.collects || '—'))}</td>
+      <td class="td-num">${escHtml(String(d.comments || '—'))}</td>
+      <td class="td-date" style="max-width:180px;word-break:break-all;">
+        ${d.original_url ? `<a href="${escHtml(d.original_url)}" target="_blank" style="color:#ff2442;font-size:12px;">原链接</a>` : '—'}
+      </td>
+      <td class="td-date">${escHtml(d.scraped_at || '')}</td>
+    `;
+    tbody.appendChild(tr);
+    document.getElementById('countBadge').textContent = rowCount;
+  }
+
+  function toggleContent(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('expanded');
+  }
+
+  // ── 工具函数 ──
+  function setStatus(msg, type = '', loading = false) {
+    const bar = document.getElementById('statusBar');
+    bar.className = type ? `status-bar ${type}` : 'status-bar';
+    bar.style.color = type === 'error' ? '#c0392b'
+                    : type === 'success' ? '#27ae60'
+                    : type === 'loading' ? '#2196f3' : '#888';
+    document.getElementById('statusText').textContent = msg;
+    if (loading) setLoading(true);
+  }
+
+  function setLoading(on) {
+    document.getElementById('spinner').className = on ? 'spinner show' : 'spinner';
+  }
+
+  function escHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  // ── Audit ──────────────────────────────────────────────────────
+  let _dirtyRows = [];
+
+  async function openAudit() {
+    document.getElementById('auditMask').classList.add('show');
+    document.getElementById('auditLog').innerHTML = '<div style="color:#bbb;text-align:center;padding-top:40px;">扫描中...</div>';
+    document.getElementById('auditBar').style.width = '0%';
+    document.getElementById('auditFixBtn').disabled = true;
+
+    try {
+      const res = await fetch('/audit');
+      const d = await res.json();
+      _dirtyRows = d.dirty;
+      const sub = document.getElementById('auditSub');
+      if (_dirtyRows.length === 0) {
+        sub.textContent = `共 ${d.total} 条数据，未发现脏数据 ✅`;
+        document.getElementById('auditLog').innerHTML = '<div style="color:#27ae60;text-align:center;padding-top:40px;">所有数据正常，无需修复</div>';
+      } else {
+        sub.textContent = `共 ${d.total} 条数据，发现 ${_dirtyRows.length} 条脏数据`;
+        document.getElementById('auditLog').innerHTML = _dirtyRows.map(r =>
+          `<div class="log-item">
+            <span class="log-icon">⚠️</span>
+            <span class="log-text">第 ${r.seq} 行：<b>${escHtml(r.title || '无标题')}</b><br>
+            <span style="color:#aaa;font-size:12px;">${escHtml(r.url)}</span></span>
+          </div>`
+        ).join('');
+        document.getElementById('auditFixBtn').disabled = false;
+      }
+    } catch(e) {
+      document.getElementById('auditSub').textContent = '扫描失败：' + e.message;
+    }
+  }
+
+  function closeAudit() {
+    document.getElementById('auditMask').classList.remove('show');
+  }
+
+  async function startFix() {
+    document.getElementById('auditFixBtn').disabled = true;
+    document.getElementById('auditCloseBtn').disabled = true;
+    document.getElementById('auditLog').innerHTML = '';
+    document.getElementById('auditSub').textContent = `正在修复 ${_dirtyRows.length} 条脏数据...`;
+
+    const total = _dirtyRows.length;
+    let fixed = 0;
+
+    const es = new EventSource('/audit/fix', {withCredentials: false});
+    // EventSource 不支持 POST，改用 fetch + ReadableStream
+    es.close();
+
+    const resp = await fetch('/audit/fix', {method: 'POST'});
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const ev = JSON.parse(line.slice(5).trim());
+          handleAuditEvent(ev, total);
+          if (ev.type === 'done') { fixed = ev.fixed; }
+        } catch(e) {}
+      }
+    }
+
+    document.getElementById('auditCloseBtn').disabled = false;
+    document.getElementById('auditSub').textContent = `修复完成：成功 ${fixed} / ${total} 条`;
+    document.getElementById('auditBar').style.width = '100%';
+
+    // 刷新表格
+    await loadHistoryData_refresh();
+  }
+
+  function handleAuditEvent(ev, total) {
+    const log = document.getElementById('auditLog');
+    if (ev.type === 'progress') {
+      const pct = Math.round(ev.idx / total * 100);
+      document.getElementById('auditBar').style.width = pct + '%';
+      document.getElementById('auditSub').textContent = `正在修复 ${ev.idx} / ${total}...`;
+      if (ev.status === 'scraping') {
+        log.innerHTML += `<div class="log-item" id="audit-row-${ev.seq}">
+          <span class="log-icon">⏳</span>
+          <span class="log-text">第 ${ev.seq} 行：采集中...</span></div>`;
+      } else if (ev.status === 'ok') {
+        const el = document.getElementById('audit-row-' + ev.seq);
+        if (el) el.outerHTML = `<div class="log-item">
+          <span class="log-icon">✅</span>
+          <span class="log-text">第 ${ev.seq} 行已修复：<b>${escHtml(ev.title)}</b></span></div>`;
+      } else if (ev.status === 'fail') {
+        const el = document.getElementById('audit-row-' + ev.seq);
+        if (el) el.outerHTML = `<div class="log-item">
+          <span class="log-icon">❌</span>
+          <span class="log-text log-err">第 ${ev.seq} 行失败：${escHtml(ev.error)}</span></div>`;
+      }
+      log.scrollTop = log.scrollHeight;
+    }
+  }
+
+  // ── 清空数据 ──
+  function openClear() {
+    document.getElementById('clearMask').classList.add('show');
+  }
+  function closeClear() {
+    document.getElementById('clearMask').classList.remove('show');
+  }
+  async function doClear() {
+    document.getElementById('clearConfirmBtn').disabled = true;
+    document.getElementById('clearCancelBtn').disabled = true;
+    try {
+      const res = await fetch('/clear', {method: 'POST'});
+      const d = await res.json();
+      if (d.ok) {
+        closeClear();
+        // 重置表格
+        document.getElementById('tableBody').innerHTML = `
+          <tr id="emptyRow">
+            <td colspan="12">
+              <div class="empty-state">
+                <div class="icon">📋</div>
+                <p>数据已清空，可以开始新一轮采集！</p>
+              </div>
+            </td>
+          </tr>`;
+        rowCount = 0;
+        document.getElementById('countBadge').textContent = 0;
+        setStatus('✅ 数据已清空，可开始新一轮采集', 'success');
+      }
+    } catch(e) {
+      setStatus('❌ 清空失败：' + e.message, 'error');
+    } finally {
+      document.getElementById('clearConfirmBtn').disabled = false;
+      document.getElementById('clearCancelBtn').disabled = false;
+    }
+  }
+
+  async function loadHistoryData_refresh() {
+    // 重新加载全部数据刷新表格
+    document.getElementById('tableBody').innerHTML = '';
+    rowCount = 0;
+    await loadHistoryData();
+  }
+
+</script>
+<!-- Duplicate 弹窗 -->
+<div id="dupMask">
+  <div id="dupModal">
+    <h3>⚠️ 检测到重复内容</h3>
+    <div style="font-size:13px;color:#888;">该链接已存在于采集列表中：</div>
+    <div id="dupExisting"></div>
+    <div style="font-size:13px;color:#555;">是否仍要重复添加？</div>
+    <div id="dupModalFooter">
+      <button id="dupCancelBtn" onclick="closeDup()">取消</button>
+      <button id="dupAddBtn" onclick="forceAdd()">仍然添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clear 弹窗 -->
+<div id="clearMask">
+  <div id="clearModal">
+    <h3>🗑️ 清空采集数据</h3>
+    <div class="sub">
+      此操作将删除 Excel 中<b>所有已采集的笔记数据</b>，仅保留表头，方便开始新一轮采集。<br><br>
+      请确认已导出备份，操作<b>不可撤销</b>。
+    </div>
+    <div id="clearModalFooter">
+      <button id="clearCancelBtn" onclick="closeClear()">取消</button>
+      <button id="clearConfirmBtn" onclick="doClear()">确认清空</button>
+    </div>
+  </div>
+</div>
+
+<!-- Audit 弹窗 -->
+<div id="auditMask">
+  <div id="auditModal">
+    <h3>🔧 脏数据修复</h3>
+    <div id="auditSub" class="sub">正在扫描...</div>
+    <div id="auditProgress"><div id="auditBar"></div></div>
+    <div id="auditLog"><div style="color:#bbb;text-align:center;padding-top:40px;">点击「开始修复」自动重新采集脏数据行</div></div>
+    <div id="auditModalFooter">
+      <button id="auditCloseBtn" onclick="closeAudit()">关闭</button>
+      <button id="auditFixBtn" onclick="startFix()" disabled>开始修复</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
